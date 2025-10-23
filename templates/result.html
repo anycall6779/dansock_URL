@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR 결과 확인</title>
+    <style>
+        /* [수정] 기본 글꼴 크기 추가 */
+        body { font-family: sans-serif; margin: 20px; font-size: 16px; }
+        h1, h2 { border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+        
+        /* [추가] 테이블 래퍼: 모바일에서 가로 스크롤 */
+        .table-container {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        
+        table { border-collapse: collapse; width: 100%; max-width: 800px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        
+        /* [수정] 모바일에서 글꼴 크기가 너무 작아지지 않도록 */
+        input[type="text"] { 
+            width: 95%; 
+            padding: 8px; 
+            box-sizing: border-box; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 1em; 
+        }
+        input.ocr-fail { background-color: #fffbe6; border-color: #f0ad4e; font-weight: bold; }
+        input[type="submit"] { 
+            width: 100%; /* [수정] 버튼 너비 100%로 */
+            max-width: 400px; /* [추가] 너무 커지지 않게 */
+            display: block; /* [추가] */
+            margin: 10px auto; /* [추가] */
+            padding: 12px 20px; 
+            font-size: 1.1em; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 5px; 
+        }
+        .info { background-color: #eef; padding: 15px; border-radius: 5px; }
+        .report-text { 
+            font-family: monospace; 
+            font-size: 1.1em; /* [수정] 1.2em -> 1.1em */
+            color: #d9534f; 
+            background: #f9f9f9; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto; /* [추가] 보고 텍스트도 길면 스크롤 */
+        }
+        
+        /* (사진 보기) 링크 스타일 */
+        .view-image-link {
+            font-size: 0.9em;
+            color: #007bff;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-left: 10px;
+        }
+        .view-image-link:hover { color: #0056b3; }
+
+        /* 모달(미리보기) 창 스타일 */
+        .modal {
+            display: none; /* 평소에는 숨김 */
+            position: fixed; /* 화면에 고정 */
+            z-index: 1000; /* 최상단에 표시 */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto; /* 스크롤 가능 */
+            background-color: rgba(0,0,0,0.8); /* 반투명 검은색 배경 */
+            padding-top: 50px;
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            width: 90%;
+            max-width: 900px; /* 이미지 최대 너비 */
+        }
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            transition: 0.3s;
+            cursor: pointer;
+        }
+        .modal-close:hover { color: #bbb; }
+    </style>
+</head>
+<body>
+    <h1>OCR 결과 확인 및 수정</h1>
+    
+    <div class="info">
+        <p><strong>단속 위치:</strong> {{ location }}</p>
+        <p><strong>단속 사유:</strong> {{ reason }}</p>
+        <hr>
+        <p><strong>카톡 보고용 텍스트 (복사하세요):</strong></p>
+        <div class="report-text">{{ report_text }}</div>
+    </div>
+
+    <h2>차량 번호 확인</h2>
+    <p>OCR 추천 번호를 확인하고, 틀렸으면 수정하세요.<br>
+       저장하지 않을 차량은 <strong>빈칸</strong>으로 두거나 <strong>'s'</strong>를 입력하세요.</p>
+
+    <form action="/save" method="POST">
+        <input type="hidden" name="location" value="{{ location }}">
+        <input type="hidden" name="reason" value="{{ reason }}">
+        <input type="hidden" name="report_text" value="{{ report_text }}">
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>파일명</th>
+                        <th>OCR 추천 번호 (수정 가능)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for res in results %}
+                    <tr>
+                        <td>
+                            {{ res.filename }}
+                            <span class="view-image-link" data-img-url="{{ res.image_url }}">(사진 보기)</span>
+                        </td>
+                        <td>
+                            <input type="text" 
+                                   name="plate_{{ loop.index }}" 
+                                   value="{{ res.plate }}"
+                                   {% if not res.plate %}
+                                       class="ocr-fail"
+                                       placeholder="[인식 실패] 번호판 직접 입력"
+                                   {% endif %}
+                            >
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <br>
+        <input type="submit" value="[ 이대로 엑셀에 최종 저장 ]">
+    </form>
+
+    <div id="imageModal" class="modal">
+        <span class="modal-close" id="modalClose">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script>
+        // 모달 요소 가져오기
+        const modal = document.getElementById("imageModal");
+        const modalImg = document.getElementById("modalImage");
+        const modalClose = document.getElementById("modalClose");
+
+        // 1. (사진 보기) 링크에 클릭 이벤트 추가
+        document.querySelectorAll('.view-image-link').forEach(link => {
+            link.addEventListener('click', function(event) {
+                event.preventDefault(); // 링크 이동 방지
+                modal.style.display = "block";
+                // span 태그의 data-img-url 속성에서 이미지 주소 가져오기
+                modalImg.src = this.dataset.imgUrl; 
+            });
+        });
+
+        // 2. 닫기 버튼(X) 클릭 시 모달 닫기
+        modalClose.onclick = function() {
+            modal.style.display = "none";
+        }
+        
+        // 3. 모달 배경 클릭 시 모달 닫기
+        modal.onclick = function(event) {
+            // (이미지 클릭 시 닫히지 않도록 수정)
+            if (event.target === modal) { 
+                 modal.style.display = "none";
+            }
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>저장 완료</title>
+    <style>
+        /* [수정] 기본 글꼴 크기 추가 및 body 마진 조정 */
+        body { font-family: sans-serif; margin: 20px; max-width: 600px; margin: auto; font-size: 16px; }
+        .container { background-color: #f0fff0; border: 1px solid #28a745; padding: 20px; border-radius: 5px; text-align: center; }
+        .report-text { 
+            font-family: monospace; 
+            font-size: 1.1em; /* [수정] 1.2em -> 1.1em */
+            color: #d9534f; 
+            background: #f9f9f9; 
+            padding: 10px; 
+            text-align: left; 
+            overflow-x: auto; /* [추가] 길면 스크롤 */
+            word-break: break-all; /* [추가] 긴 텍스트 줄바꿈 */
+        }
+        a { text-decoration: none; color: #007bff; }
+        
+        /* [수정] 버튼 스타일 */
+        .button-container { margin-top: 15px; }
+        a.button { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 12px 20px; /* [수정] 패딩 조정 */
+            border-radius: 5px; 
+            margin: 8px 5px; /* [수정] 마진 조정 */
+            display: block; /* [수정] 버튼을 block 요소로 변경 */
+            width: 90%; /* [추가] 너비 지정 */
+            margin-left: auto; /* [추가] 가운데 정렬 */
+            margin-right: auto; /* [추가] 가운데 정렬 */
+            box-sizing: border-box; /* [추가] */
+            font-size: 1.1em; /* [추가] */
+        }
+        /* [추가] 최종 보고서 버튼은 다른 색상 */
+        a.report-button {
+            background-color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>✅ 저장 완료 (총 {{ count }}건)</h2>
+        <p>엑셀 파일 <strong>{{ excel_file }}</strong>에 저장이 완료되었습니다.</p>
+        
+        <p><strong>카톡 보고용 텍스트 (참고):</strong></p>
+        <div class="report-text">{{ report_text }}</div>
+        
+        <hr>
+        
+        <div class="button-container">
+            <a href="/download/{{ excel_file }}" class="button">엑셀 파일 다운로드</a>
+            
+            <a href="/report" class="button report-button" target="_blank">최종 보고서 보기</a>
+        </div>
+        
+        <p style="margin-top: 20px;"><a href="/">새 작업 하러가기 (처음으로)</a></p>
+    </div>
+</body>
+</html>

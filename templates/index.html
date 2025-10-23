@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주차 단속 OCR 업로더</title>
+    <style>
+        /* [수정] 기본 글꼴 크기 추가 및 body 마진 조정 */
+        body { 
+            font-family: sans-serif; 
+            margin: 20px; 
+            max-width: 600px; 
+            margin-left: auto; 
+            margin-right: auto; 
+            font-size: 16px; 
+        }
+        div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        /* [수정] 모바일에서 글꼴 크기가 너무 작아지지 않도록 */
+        select, input[type="file"] { 
+            width: 100%; 
+            padding: 8px; 
+            box-sizing: border-box; 
+            font-size: 1em; 
+        } 
+        input[type="submit"] { 
+            width: 100%; 
+            padding: 12px 20px; 
+            font-size: 1.1em; /* 16px -> 1.1em */
+            font-weight: bold;
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 5px;
+        }
+        input[type="submit"]:hover { background-color: #0056b3; }
+        h2 { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+    </style>
+</head>
+<body>
+    <h2>주차 단속 OCR 업로더</h2>
+    
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+        
+        <div>
+            <label for="location">1. 단속 위치:</label>
+            <select name="location" id="location">
+                {% for loc in locations %}
+                    <option value="{{ loc }}">{{ loc }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div>
+            <label for="reason">2. 단속 사유:</label>
+            <select name="reason" id="reason">
+                {% for r in reasons %}
+                    <option value="{{ r }}">{{ r }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="photos">3. 단속 사진 (여러 장 선택 가능):</label>
+            <input type="file" name="photos" id="photos" multiple accept="image/*">
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <div>
+            <input type="submit" value="[ 업로드 및 OCR 시작 ]">
+        </div>
+        
+    </form>
+</body>
+</html>

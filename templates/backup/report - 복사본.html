@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>일일 최종 보고서</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; max-width: 800px; margin: auto; }
+        .container { background-color: #f9f9f9; border: 1px solid #ddd; padding: 20px; border-radius: 5px; }
+        h1 { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        /* 복사될 내용이 담길 영역 */
+        #report-content {
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+        
+        .button-container { text-align: center; margin-top: 20px; }
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover { background-color: #218838; }
+        /* 복사 성공 시 메시지 */
+        #copy-message {
+            text-align: center;
+            color: green;
+            font-weight: bold;
+            display: none; /* 평소에는 숨김 */
+        }
+    </style>
+</head>
+<body>
+    <h1>일일 최종 보고서</h1>
+    
+    <div class="container" id="report-container">
+        <!-- 
+          web_app.py에서 'report_date'와 'summary_data'를 받음
+        -->
+        <div id="report-content">
+            <p><strong>{{ report_date }}</strong></p>
+            <br>
+            
+            {% if summary_data %}
+                {% for item in summary_data %}
+                <p>"{{ item.단속위치 }}"에 "{{ item.사유 }}" (으)로 단속된 차량이 {{ item.count }} 대 있습니다.</p>
+                {% endfor %}
+            {% else %}
+                <p>단속된 내역이 없습니다.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="button-container">
+        <button onclick="copyReport()">보고서 내용 복사하기</button>
+        <p id="copy-message">복사 완료!</p>
+    </div>
+
+    <script>
+        function copyReport() {
+            const reportContent = document.getElementById('report-content');
+            const paragraphs = reportContent.querySelectorAll('p');
+            let textToCopy = "";
+
+            // <p> 태그의 텍스트를 줄바꿈(\n)과 함께 합칩니다.
+            paragraphs.forEach(p => {
+                textToCopy += p.innerText + "\n";
+            });
+            
+            // (참고: execCommand는 구식이지만, iFrame/보안 환경에서 클립보드 API보다 안정적일 수 있습니다)
+            // 1. 임시 <textarea>를 만듭니다.
+            const textArea = document.createElement('textarea');
+            textArea.value = textToCopy.trim(); // 앞뒤 공백 제거
+            document.body.appendChild(textArea);
+            
+            // 2. 텍스트를 선택하고 복사합니다.
+            textArea.select();
+            document.execCommand('copy');
+            
+            // 3. 임시 <textarea>를 제거합니다.
+            document.body.removeChild(textArea);
+
+            // 4. "복사 완료!" 메시지 표시
+            const message = document.getElementById('copy-message');
+            message.style.display = 'block';
+            setTimeout(() => {
+                message.style.display = 'none';
+            }, 2000); // 2초 후에 메시지 숨김
+        }
+    </script>
+</body>
+</html>

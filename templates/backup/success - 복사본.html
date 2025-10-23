@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>저장 완료</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; max-width: 600px; margin: auto; }
+        .container { background-color: #f0fff0; border: 1px solid #28a745; padding: 20px; border-radius: 5px; text-align: center; }
+        .report-text { font-family: monospace; font-size: 1.2em; color: #d9534f; background: #f9f9f9; padding: 10px; text-align: left; }
+        a { text-decoration: none; color: #007bff; }
+        
+        /* [수정] 버튼 스타일 */
+        .button-container { margin-top: 15px; }
+        a.button { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 10px 15px; 
+            border-radius: 5px; 
+            margin: 5px;
+            display: inline-block; /* 버튼 정렬을 위해 */
+        }
+        /* [추가] 최종 보고서 버튼은 다른 색상 */
+        a.report-button {
+            background-color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>✅ 저장 완료 (총 {{ count }}건)</h2>
+        <p>엑셀 파일 <strong>{{ excel_file }}</strong>에 저장이 완료되었습니다.</p>
+        
+        <p><strong>카톡 보고용 텍스트 (참고):</strong></p>
+        <div class="report-text">{{ report_text }}</div>
+        
+        <hr>
+        
+        <!-- [수정] 버튼 영역 -->
+        <div class="button-container">
+            <a href="/download/{{ excel_file }}" class="button">엑셀 파일 다운로드</a>
+            
+            <!-- [추가] 최종 보고서 버튼 -->
+            <a href="/report" class="button report-button" target="_blank">최종 보고서 보기</a>
+        </div>
+        
+        <p style="margin-top: 20px;"><a href="/">새 작업 하러가기 (처음으로)</a></p>
+    </div>
+</body>
+</html>
