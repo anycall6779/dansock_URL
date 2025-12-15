@@ -11,7 +11,6 @@ import urllib.parse
 
 # --- 필요한 라이브러리 자동 설치 ---
 def install_package(package):
-    """지정된 패키지를 설치합니다."""
     print(f"필수 라이브러리 '{package}'를 설치합니다...")
     import subprocess
     try:
@@ -19,7 +18,6 @@ def install_package(package):
         print(f"'{package}' 설치 완료.")
     except Exception as e:
         print(f"'{package}' 설치 실패: {e}")
-        print("스크립트를 중지합니다. 수동으로 설치해주세요.")
         sys.exit(1)
 
 try:
@@ -41,7 +39,6 @@ try:
 except ImportError:
     install_package("Flask")
     from flask import Flask
-# ---------------------------------
 
 # --- Google Cloud 인증 설정 ---
 SERVICE_ACCOUNT_FILE = os.path.join("CLOUD VISION API", "API.json")
@@ -53,8 +50,8 @@ if not os.path.exists(full_path_to_key):
     sys.exit(1)
     
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = full_path_to_key
-vision_client = vision.ImageAnnotatorClient()
-print("--- Google Vision API 클라이언트 로드 완료 ---")
+# [수정 1] 전역 vision_client 삭제 (토큰 만료 방지)
+print("--- Google Vision API 설정 완료 (호출 시 연결됨) ---")
 
 # --- 기본 설정 ---
 LOCATIONS = [
@@ -87,7 +84,7 @@ excel_lock = threading.Lock()
 
 def backup_old_files():
     """오늘 날짜가 아닌 엑셀 파일은 백업 폴더로 이동"""
-    print("--- 백업 확인 시작 ---")
+    # print("--- 백업 확인 중 ---") # 로그 너무 많이 쌓임 방지
     today_str = datetime.now().strftime("%Y-%m-%d")
     
     for file in os.listdir(script_dir):
@@ -97,7 +94,7 @@ def backup_old_files():
                     src = os.path.join(script_dir, file)
                     dst = os.path.join(BACKUP_FOLDER, file)
                     shutil.move(src, dst)
-                    print(f"[백업 완료] {file} -> backup/")
+                    print(f"[자동 백업] {file} -> backup 폴더로 이동됨")
                 except Exception as e:
                     print(f"[백업 실패] {file}: {e}")
 
@@ -118,12 +115,17 @@ def clean_plate_text(text):
     if numbers_only: return numbers_only
     return ""
 
+# [수정 2] 장시간 실행 시 토큰 만료 방지 (함수 안에서 연결)
 def detect_plate_google_vision(img_path):
     try:
         with open(img_path, 'rb') as image_file:
             content = image_file.read()
+            
+        # 여기서 매번 새로 연결 (서버 재시작 필요 없음)
+        client = vision.ImageAnnotatorClient()
         image = vision.Image(content=content)
-        response = vision_client.text_detection(image=image)
+        
+        response = client.text_detection(image=image)
         if response.error.message:
             raise Exception(f"API Error: {response.error.message}")
         if response.text_annotations:
@@ -150,13 +152,12 @@ def save_to_excel(entries_list, file_name):
             print(f"[!!! 오류] '{file_name}' 파일이 열려있습니다!")
             return False
 
-# 서버 시작 시 백업 수행
-backup_old_files()
-
 # --- Flask 라우트 ---
 
 @app.route('/')
 def index():
+    # [수정 3] 홈페이지 접속할 때마다 날짜 지난 파일 자동 정리
+    backup_old_files()
     return render_template('index.html', locations=LOCATIONS, reasons=REASONS)
 
 @app.route('/help')
@@ -174,12 +175,9 @@ def upload_files():
         reason = request.form['reason']
         uploaded_files = request.files.getlist('photos')
         
-        # [수정된 부분] 폴더 경로에 오전/오후 추가
-        # [주의] request.form['ampm']으로 받아와야 함 (HTML 라디오버튼)
         try:
             ampm = request.form['ampm']
         except KeyError:
-            # 혹시라도 값이 안 넘어오면 시간 기준으로 자동 설정
             now = datetime.now()
             ampm = "오전" if now.hour < 12 else "오후"
         
@@ -187,7 +185,6 @@ def upload_files():
         safe_location = location.replace('/', '-')
         safe_reason = reason.replace('/', '-')
         
-        # 경로 생성: uploads / 2024.05.20 / 3동 / 오전 / 주차선위반
         target_folder = os.path.join(app.config['UPLOAD_FOLDER_BASE'], today_str, safe_location, ampm, safe_reason)
         os.makedirs(target_folder, exist_ok=True)
         
@@ -196,6 +193,7 @@ def upload_files():
             if file and file.filename:
                 temp_path = os.path.join(target_folder, file.filename)
                 file.save(temp_path)
+                # 함수 내부에서 클라이언트 연결하므로 토큰 오류 없음
                 detected_plate = detect_plate_google_vision(temp_path)
                 
                 rel_path = os.path.relpath(temp_path, app.config['UPLOAD_FOLDER_BASE'])
@@ -251,12 +249,7 @@ def send_upload(path):
 def daily_report():
     try:
         today_str = datetime.now().strftime('%Y-%m-%d')
-        
-        target_files = [
-            f"주차단속내역_{today_str}_오전.xlsx",
-            f"주차단속내역_{today_str}_오후.xlsx"
-        ]
-        
+        target_files = [f"주차단속내역_{today_str}_오전.xlsx", f"주차단속내역_{today_str}_오후.xlsx"]
         combined_df = pd.DataFrame()
         
         for fname in target_files:
@@ -276,29 +269,24 @@ def daily_report():
         report_date_str = datetime.now().strftime('%Y년 %m월 %d일')
 
         return render_template('report.html', report_date=report_date_str, summary_data=summary_data)
-
     except Exception as e:
         return f"<h1>오류 발생: {e}</h1> <a href='/'>돌아가기</a>"
 
-# --- [수정] Cyrene 이미지 불러오기 (이미지가 templates에 있어도 불러오게 함) ---
+# [추가] Cyrene 이미지
 @app.route('/cyrene_img')
 def serve_cyrene():
-    # templates/assest 폴더 안에 있는 cyrene.webp 파일을 찾아서 보내줌
     img_folder = os.path.join(script_dir, 'templates', 'assest')
     return send_from_directory(img_folder, 'cyrene.webp')
 
-# --- [수정] 사용 설명서 다운로드 (제한 없음) ---
-# 이 부분이 반드시 'if __name__' 보다 위에 있어야 합니다!
+# [추가] 가이드 다운로드 (조건 없이)
 @app.route('/download_guide/<filename>')
 def download_guide_file(filename):
-    print(f"다운로드 요청 받음: {filename}")
+    print(f"다운로드 요청: {filename}")
     try:
         return send_from_directory(script_dir, filename, as_attachment=True)
     except Exception as e:
-        print(f"다운로드 오류: {e}")
-        return f"파일을 찾을 수 없습니다: {filename}", 404
+        return f"파일 없음: {filename}", 404
 
-# --- 서버 실행 ---
 if __name__ == '__main__':
     print(f"--- 서버 시작: http://localhost:5000 ---")
     app.run(host='0.0.0.0', port=5000, debug=False)
