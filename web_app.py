@@ -175,10 +175,15 @@ def upload_files():
         uploaded_files = request.files.getlist('photos')
         
         # [수정된 부분] 폴더 경로에 오전/오후 추가
-        now = datetime.now()
-        today_str = now.strftime('%Y.%m.%d')
-        ampm = "오전" if now.hour < 12 else "오후"
+        # [주의] request.form['ampm']으로 받아와야 함 (HTML 라디오버튼)
+        try:
+            ampm = request.form['ampm']
+        except KeyError:
+            # 혹시라도 값이 안 넘어오면 시간 기준으로 자동 설정
+            now = datetime.now()
+            ampm = "오전" if now.hour < 12 else "오후"
         
+        today_str = datetime.now().strftime('%Y.%m.%d')
         safe_location = location.replace('/', '-')
         safe_reason = reason.replace('/', '-')
         
@@ -275,6 +280,25 @@ def daily_report():
     except Exception as e:
         return f"<h1>오류 발생: {e}</h1> <a href='/'>돌아가기</a>"
 
+# --- [수정] Cyrene 이미지 불러오기 (이미지가 templates에 있어도 불러오게 함) ---
+@app.route('/cyrene_img')
+def serve_cyrene():
+    # templates/assest 폴더 안에 있는 cyrene.webp 파일을 찾아서 보내줌
+    img_folder = os.path.join(script_dir, 'templates', 'assest')
+    return send_from_directory(img_folder, 'cyrene.webp')
+
+# --- [수정] 사용 설명서 다운로드 (제한 없음) ---
+# 이 부분이 반드시 'if __name__' 보다 위에 있어야 합니다!
+@app.route('/download_guide/<filename>')
+def download_guide_file(filename):
+    print(f"다운로드 요청 받음: {filename}")
+    try:
+        return send_from_directory(script_dir, filename, as_attachment=True)
+    except Exception as e:
+        print(f"다운로드 오류: {e}")
+        return f"파일을 찾을 수 없습니다: {filename}", 404
+
+# --- 서버 실행 ---
 if __name__ == '__main__':
     print(f"--- 서버 시작: http://localhost:5000 ---")
     app.run(host='0.0.0.0', port=5000, debug=False)
