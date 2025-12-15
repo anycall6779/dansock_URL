@@ -1,12 +1,13 @@
 import pandas as pd
 import os
 import sys
+import shutil
 from datetime import datetime
 import re
 import glob
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
-import threading # 엑셀 파일 동시 접근 방지를 위한 라이브러리
-import urllib.parse # URL 한글/공백 처리를 위한 라이브러리
+import threading 
+import urllib.parse 
 
 # --- 필요한 라이브러리 자동 설치 ---
 def install_package(package):
@@ -14,12 +15,11 @@ def install_package(package):
     print(f"필수 라이브러리 '{package}'를 설치합니다...")
     import subprocess
     try:
-        # pip가 PATH에 없어도 실행되도록 sys.executable 사용
         subprocess.check_call([sys.executable, "-m", "pip", "install", package])
         print(f"'{package}' 설치 완료.")
     except Exception as e:
         print(f"'{package}' 설치 실패: {e}")
-        print("스크립트를 중지합니다. 수동으로 설치해주세요. (예: pip install {package})")
+        print("스크립트를 중지합니다. 수동으로 설치해주세요.")
         sys.exit(1)
 
 try:
@@ -55,10 +55,8 @@ if not os.path.exists(full_path_to_key):
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = full_path_to_key
 vision_client = vision.ImageAnnotatorClient()
 print("--- Google Vision API 클라이언트 로드 완료 ---")
-# ---------------------------------
 
 # --- 기본 설정 ---
-# (요청: 드롭다운 순서 변경)
 LOCATIONS = [
     "1동", "2동", "3동", "4동", "5동",
     "6동", "7동", "8동", "9동", "10동",
@@ -74,32 +72,53 @@ REASONS = [
 ]
 
 UPLOAD_FOLDER_BASE = os.path.join(script_dir, 'uploads')
+BACKUP_FOLDER = os.path.join(script_dir, 'backup')
+
 if not os.path.exists(UPLOAD_FOLDER_BASE):
     os.makedirs(UPLOAD_FOLDER_BASE)
+if not os.path.exists(BACKUP_FOLDER):
+    os.makedirs(BACKUP_FOLDER)
 
-app = Flask(__name__) # Flask 앱 생성
+app = Flask(__name__)
 app.config['UPLOAD_FOLDER_BASE'] = UPLOAD_FOLDER_BASE
-excel_lock = threading.Lock() # 엑셀 파일 동시 접근 방지를 위한 잠금
-# ---------------------------------
+excel_lock = threading.Lock()
 
 # --- 도우미 함수들 ---
+
+def backup_old_files():
+    """오늘 날짜가 아닌 엑셀 파일은 백업 폴더로 이동"""
+    print("--- 백업 확인 시작 ---")
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    for file in os.listdir(script_dir):
+        if file.startswith("주차단속내역_") and file.endswith(".xlsx"):
+            if today_str not in file:
+                try:
+                    src = os.path.join(script_dir, file)
+                    dst = os.path.join(BACKUP_FOLDER, file)
+                    shutil.move(src, dst)
+                    print(f"[백업 완료] {file} -> backup/")
+                except Exception as e:
+                    print(f"[백업 실패] {file}: {e}")
+
+def get_current_excel_filename():
+    """예: 주차단속내역_2024-05-20_오전.xlsx"""
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    ampm = "오전" if now.hour < 12 else "오후"
+    return f"주차단속내역_{date_str}_{ampm}.xlsx"
+
 def clean_plate_text(text):
-    """(요청: 숫자만 추출하는 로직 반영됨)"""
     cleaned_text = re.sub(r'[\s\n\.-]', '', text)
-    # 1. 신형 번호판
     match = re.search(r'\d{2,3}[가-힣]{1}\d{4}', cleaned_text)
     if match: return match.group(0)
-    # 2. 구형 번호판
     match = re.search(r'[가-힣]{2}\d{2}[가-힣]{1}\d{4}', cleaned_text)
     if match: return match.group(0)
-    # 3. 형식 불일치 시 숫자만 추출
     numbers_only = re.sub(r'\D', '', cleaned_text)
     if numbers_only: return numbers_only
-    # 4. 숫자도 없으면 빈칸
     return ""
 
 def detect_plate_google_vision(img_path):
-    """Google Vision API로 텍스트 감지"""
     try:
         with open(img_path, 'rb') as image_file:
             content = image_file.read()
@@ -111,11 +130,10 @@ def detect_plate_google_vision(img_path):
             return clean_plate_text(response.text_annotations[0].description)
         return ""
     except Exception as e:
-        print(f"[!] OCR 처리 오류 ({os.path.basename(img_path)}): {e}")
+        print(f"[!] OCR 오류: {e}")
         return ""
 
 def save_to_excel(entries_list, file_name):
-    """데이터를 엑셀 파일에 저장 (스레드 잠금)"""
     with excel_lock:
         try:
             df = pd.read_excel(file_name)
@@ -129,19 +147,26 @@ def save_to_excel(entries_list, file_name):
             df.to_excel(file_name, index=False, engine='openpyxl')
             return True
         except PermissionError:
-            print(f"[!!! 오류] '{file_name}' 파일이 엑셀로 열려있습니다!")
+            print(f"[!!! 오류] '{file_name}' 파일이 열려있습니다!")
             return False
-# ---------------------------------
 
-# --- Flask 라우트 (웹페이지 로직) ---
+# 서버 시작 시 백업 수행
+backup_old_files()
 
-# 1. 메인 페이지 (업로드 폼)
+# --- Flask 라우트 ---
+
 @app.route('/')
 def index():
     return render_template('index.html', locations=LOCATIONS, reasons=REASONS)
 
+@app.route('/help')
+def help_page():
+    return render_template('help.html')
 
-# 2. 파일 업로드 및 OCR 처리
+@app.route('/changelog')
+def changelog_page():
+    return render_template('changelog.html')
+
 @app.route('/upload', methods=['POST'])
 def upload_files():
     if request.method == 'POST':
@@ -149,54 +174,38 @@ def upload_files():
         reason = request.form['reason']
         uploaded_files = request.files.getlist('photos')
         
-        # (요청: 'uploads/날짜/동이름/사유' 경로)
-        today_str = datetime.now().strftime('%Y.%m.%d')
-        safe_location_name = location.replace('/', '-').replace('\\', '-')
-        safe_reason_name = reason.replace('/', '-').replace('\\', '-') 
-        target_folder = os.path.join(app.config['UPLOAD_FOLDER_BASE'], 
-                                     today_str, 
-                                     safe_location_name, 
-                                     safe_reason_name)
+        # [수정된 부분] 폴더 경로에 오전/오후 추가
+        now = datetime.now()
+        today_str = now.strftime('%Y.%m.%d')
+        ampm = "오전" if now.hour < 12 else "오후"
+        
+        safe_location = location.replace('/', '-')
+        safe_reason = reason.replace('/', '-')
+        
+        # 경로 생성: uploads / 2024.05.20 / 3동 / 오전 / 주차선위반
+        target_folder = os.path.join(app.config['UPLOAD_FOLDER_BASE'], today_str, safe_location, ampm, safe_reason)
         os.makedirs(target_folder, exist_ok=True)
         
         ocr_results = []
-        
-        print(f"--- OCR 처리 시작 ---")
-        total_files = len(uploaded_files)
-        for i, file in enumerate(uploaded_files):
+        for file in uploaded_files:
             if file and file.filename:
-                filename = file.filename 
-                temp_path = os.path.join(target_folder, filename)
+                temp_path = os.path.join(target_folder, file.filename)
                 file.save(temp_path)
-                
-                print(f"  -> ({i+1}/{total_files}) '{filename}' 처리 중... (Google API 호출)")
                 detected_plate = detect_plate_google_vision(temp_path)
                 
-                # (요청: 이미지 미리보기 오류 수정)
-                # 1. OS 경로를 웹 경로로 변경
-                relative_path = os.path.relpath(temp_path, app.config['UPLOAD_FOLDER_BASE'])
-                web_path = relative_path.replace(os.path.sep, '/')
-                # 2. 한글/공백을 URL 인코딩
+                rel_path = os.path.relpath(temp_path, app.config['UPLOAD_FOLDER_BASE'])
+                web_path = rel_path.replace(os.path.sep, '/')
                 safe_web_path = urllib.parse.quote(web_path)
                 
                 ocr_results.append({
-                    'filename': filename,
+                    'filename': file.filename,
                     'plate': detected_plate,
-                    'image_url': f"/uploads/{safe_web_path}" # 인코딩된 경로 사용
+                    'image_url': f"/uploads/{safe_web_path}"
                 })
 
-        print(f"--- OCR 처리 완료 ---")
-        report_text = f"{location} {reason} 입니다."
+        report_text = f"{location} {reason} ({ampm}) 입니다."
+        return render_template('result.html', location=location, reason=reason, report_text=report_text, results=ocr_results)
 
-        # OCR 결과를 result.html로 렌더링
-        return render_template('result.html', 
-                               location=location,
-                               reason=reason,
-                               report_text=report_text,
-                               results=ocr_results)
-
-
-# 3. 최종 엑셀 저장
 @app.route('/save', methods=['POST'])
 def save_results():
     if request.method == 'POST':
@@ -204,10 +213,8 @@ def save_results():
         reason = request.form['reason']
         report_text = request.form['report_text']
         today = datetime.now().strftime('%Y-%m-%d')
-        file_name = f"주차단속내역_{today.replace('-', '')}.xlsx"
         
-        # (요청: 엑셀 다운로드 404 오류 수정)
-        # 엑셀 저장 경로를 스크립트 폴더(script_dir) 기준으로 변경
+        file_name = get_current_excel_filename()
         full_excel_path = os.path.join(script_dir, file_name)
         
         entries_to_save = []
@@ -222,80 +229,52 @@ def save_results():
                     entries_to_save.append(new_entry)
 
         if entries_to_save:
-            save_success = save_to_excel(entries_to_save, full_excel_path)
-            if not save_success:
-                return "<h1>[오류] 엑셀 파일 저장에 실패했습니다. (파일이 열려있는지 확인하세요)</h1>"
-        else:
-            print("저장할 항목이 없습니다. (모두 's' 또는 빈칸)")
+            if not save_to_excel(entries_to_save, full_excel_path):
+                return "<h1>[오류] 엑셀 파일이 열려있습니다. 닫고 다시 시도하세요.</h1>"
+        
+        return render_template('success.html', report_text=report_text, excel_file=file_name, count=len(entries_to_save))
 
-        # 저장 완료 후 success.html을 렌더링
-        return render_template('success.html', 
-                               report_text=report_text, 
-                               excel_file=file_name,
-                               count=len(entries_to_save))
-
-# 4. 엑셀 파일 다운로드 기능
 @app.route('/download/<filename>')
 def download_file(filename):
-    # (요청: 엑셀 다운로드 404 오류 수정)
-    # 스크립트 폴더(script_dir)에서 엑셀 파일을 찾아 다운로드
-    return send_from_directory(directory=script_dir, 
-                               path=filename, 
-                               as_attachment=True)
+    return send_from_directory(directory=script_dir, path=filename, as_attachment=True)
 
-# 5. 업로드된 이미지 파일을 서빙 (미리보기용)
 @app.route('/uploads/<path:path>')
 def send_upload(path):
-    """
-    (요청: 이미지 미리보기 오류 수정)
-    uploads 폴더의 파일을 브라우저로 전송합니다.
-    Flask가 'path' 변수에 있는 URL 인코딩(예: %20)을 자동으로 디코딩해줍니다.
-    """
     return send_from_directory(app.config['UPLOAD_FOLDER_BASE'], path)
 
-# 6. (요청: '최종 보고서' 기능)
 @app.route('/report')
 def daily_report():
-    """
-    오늘 날짜의 엑셀 파일을 읽어, 
-    모든 내역을 요약한 report.html 페이지를 반환합니다.
-    """
     try:
-        # 1. 오늘 날짜의 엑셀 파일 이름 찾기
-        today = datetime.now().strftime('%Y-%m-%d')
-        file_name = f"주차단속내역_{today.replace('-', '')}.xlsx"
-        full_excel_path = os.path.join(script_dir, file_name)
-
-        if not os.path.exists(full_excel_path):
-            return "<h1>오류: 오늘 날짜의 엑셀 파일이 없습니다.</h1> <a href='/'>돌아가기</a>"
-
-        # 2. Pandas로 엑셀 파일 읽기
-        df = pd.read_excel(full_excel_path)
-
-        if df.empty:
-             return "<h1>정보: 엑셀 파일에 아직 데이터가 없습니다.</h1> <a href='/'>돌아가기</a>"
-
-        # 3. '단속위치'와 '사유'로 그룹화하여 차량 대수(size) 계산
-        summary = df.groupby(['단속위치', '사유']).size().reset_index(name='count')
+        today_str = datetime.now().strftime('%Y-%m-%d')
         
-        # 4. 템플릿에 전달할 리스트로 변환
+        target_files = [
+            f"주차단속내역_{today_str}_오전.xlsx",
+            f"주차단속내역_{today_str}_오후.xlsx"
+        ]
+        
+        combined_df = pd.DataFrame()
+        
+        for fname in target_files:
+            fpath = os.path.join(script_dir, fname)
+            if os.path.exists(fpath):
+                try:
+                    df = pd.read_excel(fpath)
+                    combined_df = pd.concat([combined_df, df], ignore_index=True)
+                except Exception as e:
+                    print(f"파일 읽기 오류 ({fname}): {e}")
+
+        if combined_df.empty:
+             return "<h1>오늘 생성된 단속 내역(오전/오후)이 없습니다.</h1> <a href='/'>돌아가기</a>"
+
+        summary = combined_df.groupby(['단속위치', '사유']).size().reset_index(name='count')
         summary_data = summary.to_dict('records')
-        
-        # 5. 오늘 날짜 문자열
         report_date_str = datetime.now().strftime('%Y년 %m월 %d일')
 
-        # 6. report.html 템플릿 렌더링
-        return render_template('report.html',
-                               report_date=report_date_str,
-                               summary_data=summary_data)
+        return render_template('report.html', report_date=report_date_str, summary_data=summary_data)
 
     except Exception as e:
-        print(f"[!!!] 보고서 생성 오류: {e}")
-        return f"<h1>보고서 생성 중 오류 발생: {e}</h1> <a href='/'>돌아가기</a>"
+        return f"<h1>오류 발생: {e}</h1> <a href='/'>돌아가기</a>"
 
-# --- 웹 서버 실행 ---
 if __name__ == '__main__':
-    print("--- 웹 서버를 시작합니다 ---")
-    print(f"--- 접속 주소: http://[서버 IP 주소]:5000 ---")
-    # debug=False가 실제 운영 환경에 더 적합합니다.
+    print(f"--- 서버 시작: http://localhost:5000 ---")
     app.run(host='0.0.0.0', port=5000, debug=False)

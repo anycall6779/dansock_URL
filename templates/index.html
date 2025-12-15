@@ -4,44 +4,237 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>주차 단속 OCR 업로더</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* [수정] 기본 글꼴 크기 추가 및 body 마진 조정 */
         body { 
-            font-family: sans-serif; 
+            font-family: 'Malgun Gothic', sans-serif; 
             margin: 20px; 
             max-width: 600px; 
             margin-left: auto; 
             margin-right: auto; 
             font-size: 16px; 
         }
+        
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .nav-icon {
+            font-size: 24px;
+            color: #555;
+            text-decoration: none;
+            padding: 5px;
+        }
+        .nav-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+
         div { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        /* [수정] 모바일에서 글꼴 크기가 너무 작아지지 않도록 */
+        
         select, input[type="file"] { 
             width: 100%; 
             padding: 8px; 
             box-sizing: border-box; 
             font-size: 1em; 
+            border: 1px solid #ccc; 
+            border-radius: 4px;
         } 
+        
+        .radio-group {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        .radio-label {
+            margin: 0;
+            margin-right: 20px;
+            font-weight: normal;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .radio-label input {
+            margin-right: 5px;
+        }
+        
         input[type="submit"] { 
             width: 100%; 
             padding: 12px 20px; 
-            font-size: 1.1em; /* 16px -> 1.1em */
+            font-size: 1.1em; 
             font-weight: bold;
             background-color: #007bff; 
             color: white; 
             border: none; 
             cursor: pointer; 
             border-radius: 5px;
+            margin-top: 10px;
         }
         input[type="submit"]:hover { background-color: #0056b3; }
-        h2 { text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px;}
+
+        .report-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+
+        /* [추가] 프로그레스 바(진행률) 팝업 스타일 */
+        #progress-overlay {
+            display: none; /* 평소에는 숨김 */
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); /* 배경 어둡게 */
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #progress-box {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        #progress-bar-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 20px;
+            margin: 15px 0;
+            overflow: hidden;
+            height: 25px;
+        }
+        #progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background-color: #28a745; /* 녹색 */
+            text-align: center;
+            line-height: 25px;
+            color: white;
+            font-size: 14px;
+            transition: width 0.2s;
+        }
+        #status-text {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
     </style>
+    <script>
+        window.onload = function() {
+            var date = new Date();
+            var hours = date.getHours();
+            if (hours >= 12) {
+                document.getElementById('pm').checked = true;
+            } else {
+                document.getElementById('am').checked = true;
+            }
+        }
+
+        // [추가] 파일 업로드 진행률 표시 스크립트
+        function uploadWithProgress(event) {
+            event.preventDefault(); // 기본 폼 제출 막기 (새로고침 방지)
+
+            var form = document.getElementById('uploadForm');
+            var formData = new FormData(form);
+            var fileInput = document.getElementById('photos');
+
+            // 파일이 선택되었는지 확인
+            if (fileInput.files.length === 0) {
+                alert("파일을 선택해주세요.");
+                return;
+            }
+
+            // UI 보이기
+            document.getElementById('progress-overlay').style.display = 'flex';
+            var progressBar = document.getElementById('progress-bar-fill');
+            var statusText = document.getElementById('status-text');
+
+            // AJAX 요청 생성
+            var xhr = new XMLHttpRequest();
+            
+            // [핵심] 업로드 진행 상태 확인 이벤트
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    var percentComplete = (e.loaded / e.total) * 100;
+                    var percentInt = Math.round(percentComplete);
+                    
+                    progressBar.style.width = percentInt + '%';
+                    progressBar.innerText = percentInt + '%';
+                    
+                    if (percentInt < 100) {
+                        statusText.innerText = "📸 사진 업로드 중...";
+                    } else {
+                        statusText.innerText = "🤖 OCR 분석 중입니다... (잠시 대기)";
+                        progressBar.style.backgroundColor = "#007bff"; // 파란색으로 변경
+                        progressBar.innerText = "분석 중";
+                    }
+                }
+            };
+
+            // 완료 시 처리
+            xhr.onload = function() {
+                if (xhr.status == 200) {
+                    // 서버에서 받은 결과 화면(HTML)으로 현재 화면 교체
+                    document.open();
+                    document.write(xhr.responseText);
+                    document.close();
+                } else {
+                    alert("업로드 중 오류가 발생했습니다. 다시 시도해주세요.");
+                    document.getElementById('progress-overlay').style.display = 'none';
+                }
+            };
+
+            xhr.onerror = function() {
+                alert("네트워크 오류가 발생했습니다.");
+                document.getElementById('progress-overlay').style.display = 'none';
+            };
+
+            // 데이터 전송 시작
+            xhr.open("POST", "/upload", true);
+            xhr.send(formData);
+        }
+    </script>
 </head>
 <body>
-    <h2>주차 단속 OCR 업로더</h2>
+    <div id="progress-overlay">
+        <div id="progress-box">
+            <h3 id="status-text">준비 중...</h3>
+            <div id="progress-bar-container">
+                <div id="progress-bar-fill">0%</div>
+            </div>
+            <p style="font-size: 0.9em; color: #666;">창을 닫지 마세요.</p>
+        </div>
+    </div>
+
+    <div class="navbar">
+        <a href="/changelog" class="nav-icon" title="변경사항">
+            <i class="fas fa-clipboard-list"></i>
+        </a>
+        
+        <h2 class="nav-title">주차 단속 OCR 업로더</h2>
+
+        <a href="/help" class="nav-icon" title="사용설명서">
+            <i class="fas fa-question-circle"></i>
+        </a>
+    </div>
     
-    <form action="/upload" method="POST" enctype="multipart/form-data">
+    <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data" onsubmit="uploadWithProgress(event)">
         
         <div>
             <label for="location">1. 단속 위치:</label>
@@ -53,7 +246,19 @@
         </div>
         
         <div>
-            <label for="reason">2. 단속 사유:</label>
+            <label>2. 시간대 (오전/오후):</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="ampm" value="오전" id="am" checked> 오전
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="ampm" value="오후" id="pm"> 오후
+                </label>
+            </div>
+        </div>
+
+        <div>
+            <label for="reason">3. 단속 사유:</label>
             <select name="reason" id="reason">
                 {% for r in reasons %}
                     <option value="{{ r }}">{{ r }}</option>
@@ -62,7 +267,7 @@
         </div>
 
         <div>
-            <label for="photos">3. 단속 사진 (여러 장 선택 가능):</label>
+            <label for="photos">4. 단속 사진 (여러 장 선택 가능):</label>
             <input type="file" name="photos" id="photos" multiple accept="image/*">
         </div>
         
@@ -71,7 +276,12 @@
         <div>
             <input type="submit" value="[ 업로드 및 OCR 시작 ]">
         </div>
-        
+
     </form>
+
+    <a href="/report" class="report-link">
+        <i class="fas fa-chart-bar"></i> 금일 단속 현황 보기
+    </a>
+
 </body>
 </html>

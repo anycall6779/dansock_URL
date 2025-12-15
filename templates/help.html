@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>차량 단속 홈페이지 사용법 가이드</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        h3 {
+            background-color: #eee;
+            padding: 10px;
+            border-left: 5px solid #007bff;
+            margin-top: 30px;
+        }
+        .step {
+            margin-bottom: 20px;
+            padding-left: 15px;
+        }
+        .step-title {
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #0056b3;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .highlight {
+            background-color: #fff3cd;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .warning-box {
+            background-color: #fff0f0;
+            border: 1px solid #ffcccc;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 30px;
+        }
+        .warning-title {
+            color: #dc3545;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .code-box {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .back-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background-color: #007bff;
+            color: white;
+            padding: 15px 0;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin-top: 30px;
+        }
+        .back-btn:hover { background-color: #0056b3; }
+        
+        /* 이미지 플레이스홀더 (실제 이미지가 없을 때 모양) */
+        .img-placeholder {
+            display: block;
+            background-color: #f1f3f5;
+            border: 2px dashed #ced4da;
+            text-align: center;
+            padding: 20px;
+            color: #868e96;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .icon-large { font-size: 40px; margin-bottom: 10px; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <a href="/" style="text-decoration: none; color: #666;"><i class="fas fa-arrow-left"></i> 메인으로 돌아가기</a>
+    
+    <h1>차량 단속 홈페이지 사용법 가이드</h1>
+
+    <h3>1. [cite_start]서버 실행 및 접속 [cite: 3, 4]</h3>
+    <div class="step">
+        <span class="step-title">Step 1. 서버 시작</span>
+        서버를 작동하기 위해 바탕화면의 <strong>serverstart.bat</strong> (혹은 바로가기)를 실행합니다.<br>
+        (또는 <code>C:\Users\Chungsa\Desktop\scan_bot</code> 폴더의 <code>start.bat</code>을 실행하세요.)
+        <div class="img-placeholder">
+            <i class="fas fa-cog icon-large"></i>
+            [바탕화면의 serverstart 아이콘 실행]
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 2. 실행 확인</span>
+        [cite_start]실행 후 검은색 도스창(CMD)이 3개 출력되면 서버가 정상적으로 열린 것입니다. [cite: 4]
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 3. URL 확인</span>
+        검은색 창(ngrok)에서 <code>https://xxxx.ngrok-free.app</code> 형식의 주소를 찾으세요. <br>
+        [cite_start]<span class="highlight">※ 무료 플랜을 사용 중이므로 서버를 재시작할 때마다 주소가 변경됩니다. [cite: 5, 6]</span>
+        <div class="code-box">
+            Forwarding  https://0f6b6dd8b649.ngrok-free.app -> http://localhost:5000
+        </div>
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 4. 최초 접속 시 경고 페이지</span>
+        URL로 처음 접속하면 경고 페이지가 뜹니다. [cite_start]무시하고 파란색 <strong>[Visit Site]</strong> 버튼을 클릭하여 진행해주세요. [cite: 7]
+    </div>
+
+    <h3>2. [cite_start]단속 내용 입력 및 업로드 [cite: 8, 9, 10]</h3>
+    <div class="step">
+        <span class="step-title">Step 5. 홈페이지 접속</span>
+        '주차 단속 OCR 업로더' 화면이 나오면 정상입니다.
+        <ul>
+            <li><strong>단속 위치:</strong> (예: 1동, 5동 등) 선택</li>
+            <li><strong>단속 사유:</strong> (예: 주차선 외 위반) 선택</li>
+            <li><strong>사진 업로드:</strong> [파일 선택] 버튼을 눌러 촬영한 사진을 선택하세요. (여러 장 가능)</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 6. 분석 대기</span>
+        [업로드 및 OCR 시작] 버튼을 누르면 분석이 시작됩니다.<br>
+        이미지 양에 따라 시간이 걸릴 수 있습니다. [cite_start]버그가 아니니 잠시만 기다려주세요. [cite: 10, 11]
+    </div>
+
+    <h3>3. [cite_start]결과 확인 및 저장 [cite: 12, 13]</h3>
+    <div class="step">
+        <span class="step-title">Step 7. 번호판 수정</span>
+        OCR 분석 결과 화면이 나옵니다. 실제 번호판과 인식된 번호가 일치하지 않는 경우, 텍스트 상자를 클릭하여 직접 수정해주세요.<br>
+        (저장을 원치 않는 사진은 내용을 지우거나 's'를 입력하면 저장되지 않습니다.)
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 8. 엑셀 저장</span>
+        [cite_start]수정이 완료되면 하단의 초록색 <strong>[ 이대로 엑셀에 최종 저장 ]</strong> 버튼을 눌러주세요. [cite: 13]
+    </div>
+
+    <h3>4. [cite_start]파일 확인 및 완료 [cite: 14, 15, 16]</h3>
+    <div class="step">
+        <span class="step-title">Step 9. 저장 완료</span>
+        "저장 완료" 화면이 뜨면 정상적으로 처리된 것입니다.
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 10. 엑셀 파일 확인</span>
+        [cite_start]바탕화면의 <code>scan_bot</code> 폴더 안에 <strong>주차단속내역_YYYYMMDD.xlsx</strong> 파일이 생성되었는지 확인하세요. [cite: 15]
+    </div>
+
+    <div class="step">
+        <span class="step-title">Step 11. 이미지 저장 경로</span>
+        [cite_start]업로드한 사진은 자동으로 다음 경로에 분류되어 저장됩니다. [cite: 18]<br>
+        <code>scan_bot\uploads\날짜\동이름\단속사유\</code>
+    </div>
+
+    <div class="warning-box">
+        <span class="warning-title"><i class="fas fa-exclamation-triangle"></i> 중요 주의사항</span>
+        <ul>
+            <li><strong>[필독] 엑셀 파일 닫기:</strong> 엑셀 파일이 켜져 있는 상태에서는 저장이 불가능합니다. [cite_start]단속 내용을 등록할 때는 반드시 엑셀 파일을 종료해 주세요. [cite: 21]</li>
+            [cite_start]<li><strong>서버 확인:</strong> 단속 나가기 전에 서버가 켜져 있는지, URL이 변경되지 않았는지 꼭 확인하세요. [cite: 24]</li>
+            <li><strong>API 토큰 제한:</strong> Google Vision API는 사용량 제한(토큰)이 있습니다. [cite_start]불필요한 사진을 남발하여 토큰을 낭비하지 않도록 주의해 주세요. [cite: 25]</li>
+            [cite_start]<li><strong>유지 보수:</strong> 추후 `API.json` 키 파일이나 `ngrok` 설정은 유지보수 담당자가 관리해야 합니다. [cite: 23]</li>
+            [cite_start]<li><strong>오픈 소스:</strong> 이 프로그램의 코드는 이해하고 개선할 수 있는 사람이라면 누구나 수정해도 됩니다. [cite: 22]</li>
+        </ul>
+    </div>
+
+    <a href="/" class="back-btn"><i class="fas fa-home"></i> 메인으로 돌아가기</a>
+</div>
+
+</body>
+</html>
